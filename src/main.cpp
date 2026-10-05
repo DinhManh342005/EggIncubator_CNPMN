@@ -21,8 +21,8 @@
 #define BTN_3 8              // Nút 3 (D8): MENU (Mode 0) / NEXT (Mode 1) / DOWN (Mode 2)
 #define BUZZER_PIN 9         
 // Mức kích còi: Active-HIGH (còi nối chân D9 và GND)
-#define BUZZER_ON  LOW
-#define BUZZER_OFF HIGH
+#define BUZZER_ON  HIGH
+#define BUZZER_OFF LOW
 
 #define RTC_CLK 10
 #define RTC_RST 11
@@ -96,10 +96,11 @@ const unsigned long debounceTime = 200;
 // ================= QUẢN LÝ CÒI BÁO HIỆU THÔNG MINH =================
 enum BuzzerMode {
   BUZZ_OFF = 0,
-  BUZZ_CONFIRM,       // 1 tiếng bíp ngắn 60ms khi bấm phím / nhận lệnh
+  BUZZ_CONFIRM_1,     // 1 tiếng bíp ngắn 70ms: Bấm phím, Bật/Tắt relay thủ công
+  BUZZ_CONFIRM_2,     // 2 tiếng bíp dứt khoát: Cập nhật chuẩn, Áp dụng hồ sơ thành công
   BUZZ_OVERHEAT,      // Cảnh báo quá nhiệt nguy hiểm: Bíp dồn dập (120ms ON, 120ms OFF)
-  BUZZ_UNDERHEAT,     // Cảnh báo quá lạnh: Bíp kéo dài (600ms ON, 1000ms OFF)
-  BUZZ_HUMI_ALERT     // Cảnh báo ẩm nguy cấp: Bíp nhịp đôi (80ms ON, 100ms OFF, 80ms ON, 2000ms OFF)
+  BUZZ_UNDERHEAT,     // Cảnh báo quá lạnh: Bíp 5 nhịp, nghỉ 30s
+  BUZZ_HUMI_ALERT     // Cảnh báo ẩm nguy cấp: Bíp nhịp đôi (100ms ON, 100ms OFF, 100ms ON, 2000ms OFF)
 };
 
 BuzzerMode currentBuzzerMode = BUZZ_OFF;
@@ -122,11 +123,12 @@ void guiDuLieuESP();
 void docLenhTuESP();
 void xuLyCoi();
 void kichHoatBipNgan();
+void kichHoatBipDoi();
 void kiemTraCanhBaoMoiTruong();
 void kiemTraTangNgayRTC();
 
 void setBuzzerMode(BuzzerMode mode) {
-  if (currentBuzzerMode == mode || currentBuzzerMode == BUZZ_CONFIRM) return;
+  if (currentBuzzerMode == mode || currentBuzzerMode == BUZZ_CONFIRM_1 || currentBuzzerMode == BUZZ_CONFIRM_2) return;
   currentBuzzerMode = mode;
   buzzerTimer = millis();
   buzzerStep = 0;
@@ -135,8 +137,17 @@ void setBuzzerMode(BuzzerMode mode) {
   }
 }
 
+// 1 bíp ngắn khi thao tác bấm phím / bật tắt quạt, đèn
 void kichHoatBipNgan() {
-  currentBuzzerMode = BUZZ_CONFIRM;
+  currentBuzzerMode = BUZZ_CONFIRM_1;
+  buzzerTimer = millis();
+  buzzerStep = 0;
+  digitalWrite(BUZZER_PIN, BUZZER_ON);
+}
+
+// 2 bíp dứt khoát khi cập nhật hồ sơ / thông số / ngày ấp thành công
+void kichHoatBipDoi() {
+  currentBuzzerMode = BUZZ_CONFIRM_2;
   buzzerTimer = millis();
   buzzerStep = 0;
   digitalWrite(BUZZER_PIN, BUZZER_ON);
@@ -173,7 +184,8 @@ void xuLyCoi() {
       digitalWrite(BUZZER_PIN, BUZZER_OFF);
       break;
 
-    case BUZZ_CONFIRM:
+    case BUZZ_CONFIRM_1:
+      // 1 bíp ngắn 70ms
       if (now - buzzerTimer < 70) {
         digitalWrite(BUZZER_PIN, BUZZER_ON);
       } else {
@@ -181,6 +193,22 @@ void xuLyCoi() {
         currentBuzzerMode = BUZZ_OFF;
       }
       break;
+
+    case BUZZ_CONFIRM_2: {
+      // 2 bíp dứt khoát: Bíp 80ms, nghỉ 80ms, Bíp 80ms
+      unsigned long elapsed = now - buzzerTimer;
+      if (elapsed < 80) {
+        digitalWrite(BUZZER_PIN, BUZZER_ON);
+      } else if (elapsed < 160) {
+        digitalWrite(BUZZER_PIN, BUZZER_OFF);
+      } else if (elapsed < 240) {
+        digitalWrite(BUZZER_PIN, BUZZER_ON);
+      } else {
+        digitalWrite(BUZZER_PIN, BUZZER_OFF);
+        currentBuzzerMode = BUZZ_OFF;
+      }
+      break;
+    }
 
     case BUZZ_OVERHEAT: {
       // Dồn dập xả nhiệt: Bíp 120ms ON, 120ms OFF liên tục
@@ -190,9 +218,9 @@ void xuLyCoi() {
     }
 
     case BUZZ_UNDERHEAT: {
-      // Báo quá lạnh: 3 tiếng bíp nháy dứt khoát (mỗi tiếng 200ms, nghỉ 800ms = đúng nhịp 1s), sau đó nghỉ 30s
+      // Báo quá lạnh: 5 tiếng bíp nháy dứt khoát (mỗi tiếng 200ms, nghỉ 800ms = đúng nhịp 1s), sau đó nghỉ 30s
       unsigned long elapsed = now - buzzerTimer;
-      if (buzzerStep < 3) {
+      if (buzzerStep < 5) {
         if (elapsed < 200) {
           digitalWrite(BUZZER_PIN, BUZZER_ON);
         } else if (elapsed < 1000) {
@@ -395,7 +423,7 @@ void docLenhTuESP() {
             capNhatGiaiDoanAp();
             Serial.print(F("[UNO] Chon ho so thanh cong: "));
             Serial.println(PROFILES_MAC_DINH[pIdx].ten);
-            kichHoatBipNgan();
+            kichHoatBipDoi(); // Cập nhật chuẩn -> 2 BÍP
           }
         }
         else if (cmdBuffer.startsWith("CMD:DAY:")) {
@@ -405,7 +433,7 @@ void docLenhTuESP() {
             capNhatGiaiDoanAp();
             Serial.print(F("[UNO] Chinh ngay ap thanh: "));
             Serial.println(ngayHienTai);
-            kichHoatBipNgan();
+            kichHoatBipDoi(); // Cập nhật chuẩn -> 2 BÍP
           }
         }
         else if (cmdBuffer.startsWith("CMD:SET:")) {
@@ -428,12 +456,12 @@ void docLenhTuESP() {
             capNhatGiaiDoanAp();
             Serial.print(F("[UNO] Nhan CMD:SET -> Target Temp: "));
             Serial.print(targetTemp); Serial.print(F(", Humi: ")); Serial.println(targetHumi);
+            kichHoatBipDoi(); // Cập nhật chuẩn -> 2 BÍP
           } 
           else {
             Serial.println(F("[UNO LOI]: Dinh dang CMD:SET khong hop le!"));
+            kichHoatBipNgan();
           }
-
-          kichHoatBipNgan();
         }
       }
       cmdBuffer = ""; // Xử lý xong thì xóa rỗng bộ đệm
@@ -591,6 +619,7 @@ void xuLyNutBam() {
         }
         currentMode = 0;
         lcd.clear();
+        kichHoatBipDoi(); // Lưu thông số thành công -> 2 BÍP
       }
     }
   }
@@ -598,7 +627,6 @@ void xuLyNutBam() {
   // --- NÚT 2 (D7): CHỌN (Mode 1) / UP (Mode 2) ---
   if (digitalRead(BTN_2) == LOW && (millis() - lastPress2 > debounceTime)) {
     lastPress2 = millis();
-    kichHoatBipNgan();
 
     if (currentMode == 1) {
       currentProfileIndex = selectedProfileIndex;
@@ -606,8 +634,10 @@ void xuLyNutBam() {
       capNhatGiaiDoanAp();
       currentMode = 0;
       lcd.clear();
+      kichHoatBipDoi(); // Chọn hồ sơ thành công -> 2 BÍP
     } 
     else if (currentMode == 2) {
+      kichHoatBipNgan(); // Nút UP thông thường -> 1 BÍP
       if (editStep == 0) {
         editTemp += 0.1;
         if (editTemp > 45.0) editTemp = 45.0;
@@ -615,6 +645,8 @@ void xuLyNutBam() {
         editHumi += 1;
         if (editHumi > 99) editHumi = 99;
       }
+    } else {
+      kichHoatBipNgan();
     }
   }
 }

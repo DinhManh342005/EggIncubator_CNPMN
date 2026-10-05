@@ -43,14 +43,15 @@ Hệ thống tự động điều khiển 2 rơ-le bám sát nhiệt độ và �
 > **Mặc định:** Còi luôn **TẮT** trong quá trình máy hoạt động bình thường, tuyệt đối không gây ồn.
 
 Còi chỉ phát âm thanh theo các quy ước riêng biệt sau:
-1. **1 Tiếng "Bíp" ngắn (60ms):** Báo nhận lệnh khi bạn bấm nút vật lý hoặc bấm thao tác trên Web UI.
-2. **Tít dồn dập, liên tục (120ms kêu / 120ms ngắt):** 
+1. **1 Tiếng "Bíp" ngắn (70ms):** Báo nhận lệnh khi bạn bấm nút vật lý hoặc bấm Bật/Tắt quạt/đèn/máy trên Web UI.
+2. **2 Tiếng "Bíp - Bíp" dứt khoát:** Xác nhận **CẬP NHẬT CHUẨN THÀNH CÔNG** (khi Áp dụng hồ sơ trứng mới, Lưu thông số tùy chỉnh, hoặc Đổi ngày ấp trên Web/LCD).
+3. **Tít dồn dập, liên tục (120ms kêu / 120ms ngắt):** 
    - **Cảnh báo QUÁ NHIỆT NGUY HIỂM** ($\ge 38.3^\circ\text{C}$ hoặc vượt ngưỡng mục tiêu 0.8°C).
    - Rơ-le quạt gió sẽ tự động bật cưỡng bức để tản nhiệt khẩn cấp, ngăn ngừa chết phôi.
-3. **Bíp 5 nhịp đều (1000ms kêu / 1000ms ngắt), sau đó nghỉ 30 giây rồi lặp lại:**
+4. **Bíp 5 nhịp đều (200ms kêu / 800ms ngắt, nghỉ 30s):**
    - **Cảnh báo QUÁ LẠNH** ($\le Target - 1.5^\circ\text{C}$).
    - Rơ-le đèn sưởi bật tối đa công suất để cấp nhiệt bù. Dành cho người nuôi kịp thời kiểm tra bóng sưởi hoặc nắp thùng hở.
-4. **Tít kép ngắt quãng (Bíp-bíp rồi nghỉ 2s):**
+5. **Tít kép ngắt quãng (Bíp-bíp rồi nghỉ 2s):**
    - **Cảnh báo ĐỘ ẨM NGUY CẤP** (Độ ẩm $< 45\%$ trong giai đoạn cận nở hoặc $> 88\%$).
    - Báo hiệu người dùng cần châm thêm nước vào khay tạo ẩm.
 
