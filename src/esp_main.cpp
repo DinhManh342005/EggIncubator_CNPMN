@@ -11,8 +11,11 @@
 
 SoftwareSerial linkSerial(ARDUINO_RX_PIN, ARDUINO_TX_PIN);
 
-const char* ssid = "Trung Tam TT-TV T3";
-const char* password = "12345679";
+// const char* ssid = "Trung Tam TT-TV T3";
+// const char* password = "12345679";
+const char* ssid = "Dung-4G_di";
+const char* password = "56320282";
+
 const char* www_username = "manhdinh";
 const char* www_password = "123456";
 
@@ -158,10 +161,15 @@ void docDuLieuArduino() {
   }
 }
 
-void setup() {
-  Serial.begin(115200);          // Serial cứng để cắm cáp debug máy tính
-  linkSerial.begin(9600);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno
+
+
   
+void setup() {
+    Serial.begin(115200);          // Serial cứng để cắm cáp debug máy tính
+  linkSerial.begin(9600);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno      
+  
+  // Tắt tự động kết nối lại mạng cũ trong Flash để tránh xung đột
+  WiFi.setAutoConnect(false);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   
@@ -176,7 +184,12 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\nWiFi ket noi thanh cong! IP Web: " + WiFi.localIP().toString());
   } else {
-    Serial.println("\nKhong the ket noi WiFi! Tu dong phat Access Point AP: MayApTrung_WiFi (Pass: 12345678)");
+    Serial.println("\nKhong the ket noi WiFi! Tu dong phat Access Point AP...");
+    
+    // NGẮT HẲN STA VÀ CHỜ DỪNG HẲN TRƯỚC KHI BẬT AP
+    WiFi.disconnect(true);
+    delay(200);
+    
     WiFi.mode(WIFI_AP);
     WiFi.softAP("MayApTrung_WiFi", "12345678");
     Serial.println("AP IP Web: " + WiFi.softAPIP().toString());
