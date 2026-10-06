@@ -263,7 +263,7 @@ void kiemTraTangNgayRTC() {
 
 void setup() {
   Serial.begin(9600);
-  espSerial.begin(9600);
+  espSerial.begin(38400); // Tăng tốc độ từ 9600 -> 38400 Baud
   espSerial.setTimeout(50); 
 
   Serial.println(F("\n=== HE THONG MAY AP TRUNG KHOI DONG ==="));
@@ -354,8 +354,8 @@ void loop() {
     capNhatLCD();
   }
 
-  // 6. Gửi dữ liệu sang ESP8266 mỗi 2 giây
-  if (millis() - timerGuiESP >= 2000) {
+  // 6. Gửi dữ liệu sang ESP8266 mỗi 1 giây
+  if (millis() - timerGuiESP >= 1000) {
     timerGuiESP = millis();
     guiDuLieuESP();
   }

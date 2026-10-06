@@ -47,16 +47,14 @@ void handleRoot() {
 
 void handleData() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
-  String json = "{\"temp\":" + String(temp, 1) + 
-                ",\"humi\":" + String(humi) + 
-                ",\"day\":" + String(day) + 
-                ",\"light\":" + String(light) + 
-                ",\"fan\":" + String(fan) + 
-                ",\"profile\":" + String(profileIdx) + 
-                ",\"stage\":" + String(stage) + 
-                ",\"targetTemp\":" + String(targetTemp, 1) + 
-                ",\"targetHumi\":" + String(targetHumi) + "}";
-  server.send(200, "application/json", json);
+  
+  // Tạo bộ đệm cố định, giải phóng RAM ngay sau khi gửi xong
+  char jsonBuf[256];
+  snprintf(jsonBuf, sizeof(jsonBuf),
+    "{\"temp\":%.1f,\"humi\":%d,\"day\":%d,\"light\":%d,\"fan\":%d,\"profile\":%d,\"stage\":%d,\"targetTemp\":%.1f,\"targetHumi\":%d}",
+    temp, humi, day, light, fan, profileIdx, stage, targetTemp, targetHumi);
+
+  server.send(200, "application/json", jsonBuf);
 }
 
 void setupRoutes() {
@@ -115,47 +113,44 @@ void setupRoutes() {
   });
 }
 
-// Đọc gói tin gửi từ Arduino qua SoftwareSerial (D5/D6)
+// Đọc và xử lý gói tin Serial gửi từ Arduino Uno
 void docDuLieuArduino() {
-  static String rxBuffer = "";
-  
+  static String rxBuffer = ""; // Bộ đệm lưu chuỗi nhận được
+
   while (linkSerial.available()) {
     char c = (char)linkSerial.read();
-    if (c == '\n') {
+
+    if (c == '\n') { // Gặp ký tự kết thúc gói tin
       rxBuffer.trim();
+
       if (rxBuffer.length() > 0) {
         float _t, _tt;
         int _h, _d, _l, _f, _p, _s, _th;
-        
+
+        // Trích xuất các thông số từ chuỗi gói tin
         int parsed = sscanf(rxBuffer.c_str(), "T:%f,H:%d,Day:%d,L:%d,F:%d,P:%d,S:%d,TT:%f,TH:%d", 
                             &_t, &_h, &_d, &_l, &_f, &_p, &_s, &_tt, &_th);
 
-        if (parsed >= 5) {
-          temp = _t;
-          humi = _h;
-          day = _d;
-          light = _l; // <--- CẬP NHẬT TRẠNG THÁI ĐÈN THỰC TẾ TỪ UNO
-          fan = _f;   // <--- CẬP NHẬT TRẠNG THÁI QUẠT THỰC TẾ TỪ UNO
-          if (parsed >= 9) {
-            profileIdx = _p;
-            stage = _s;
-            targetTemp = _tt;
-            targetHumi = _th;
+        if (parsed >= 5) { // Đọc thành công các thông số cơ bản
+          temp = _t; humi = _h; day = _d; light = _l; fan = _f;
+
+          if (parsed >= 9) { // Đọc thành công đầy đủ thông số cài đặt
+            profileIdx = _p; stage = _s; targetTemp = _tt; targetHumi = _th;
           }
         }
       }
-      rxBuffer = "";
-    } else if (c != '\r') {
+      rxBuffer = ""; // Reset bộ đệm sau khi xử lý xong
+    } 
+    else if (c != '\r') {
       rxBuffer += c;
-      if (rxBuffer.length() > 120) rxBuffer = "";  // Reset chong tran bo dem khi co nhieu
+      if (rxBuffer.length() > 120) rxBuffer = ""; // Tránh tràn RAM khi nhiễu tín hiệu
     }
   }
 }
-    
-  
+
  void setup() {
   Serial.begin(115200);          // Serial cứng để cắm cáp debug máy tính
-  linkSerial.begin(9600);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno           
+  linkSerial.begin(38400);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno           
   
   // ================= CẤU HÌNH WIFIMANAGER =================
   WiFiManager wifiManager;
@@ -197,4 +192,9 @@ void loop() {
   MDNS.update();        // <--- THÊM DÒNG NÀY để duy trì tên miền mayaptrung.local
   server.handleClient();
   docDuLieuArduino();
+
+ // Dọn dẹp rác RAM nếu bộ nhớ xuống dưới 6KB
+  if (ESP.getFreeHeap() < 6000) {
+    delay(10);
+  }
 }

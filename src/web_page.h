@@ -529,7 +529,32 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         });
     }
 
-    setInterval(updateData, 1500);
+    // THAY BẰNG CƠ CHẾ ĐỆ QUY CHỐNG NGHẼN NÀY:
+let isFetching = false;
+
+function autoFetchLoop() {
+  if (isFetching) return;
+  isFetching = true;
+
+  fetch('/api/data')
+    .then(r => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(d => {
+      // Cập nhật giao diện... (Giữ nguyên toàn bộ phần cập nhật UI của bạn)
+      updateUI(d); 
+    })
+    .catch(err => console.warn('Trễ kết nối:', err))
+    .finally(() => {
+      isFetching = false;
+      // Chờ server phản hồi xong 800ms mới hỏi tiếp, Web chạy cực kỳ mượt!
+      setTimeout(autoFetchLoop, 800); 
+    });
+}
+
+// Khởi chạy vòng lặp
+autoFetchLoop();
 
     function toggleDevice(dev) {
       if (dev === 'heater') { heaterState = heaterState ? 0 : 1; fetch('/api/toggle?device=heater&val=' + heaterState); }
