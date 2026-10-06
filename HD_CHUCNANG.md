@@ -277,3 +277,13 @@ void loop() {
   server.handleClient();
   docDuLieuArduino();
 }
+
+## 6. Cấu Hình Mạng & Access Point
+
+- **Chế độ kết nối Wi‑Fi (STA):** ESP8266 cố gắng kết nối tới SSID và mật khẩu đã cấu hình trong mã (`ssid`, `password`). Khi kết nối thành công, giao diện web có thể truy cập qua địa chỉ IP nội bộ (`WiFi.localIP()`).
+
+- **DNS nội bộ:** Khi ở chế độ STA, người dùng có thể mở trình duyệt và nhập địa chỉ IP nội bộ của ESP (ví dụ `http://192.168.4.1`) để truy cập giao diện điều khiển; không cần tên miền.
+
+- **Fallback Access Point (AP):** Nếu không kết nối được mạng Wi‑Fi sau 20 lần thử, ESP tự động chuyển sang chế độ AP, tạo SSID `MayApTrung_WiFi` với mật khẩu `12345678`. Giao diện web sẽ được phục vụ tại địa chỉ IP soft AP (`WiFi.softAPIP()`). Người dùng chỉ cần kết nối Wi‑Fi tới AP này rồi mở trình duyệt để tiếp tục cấu hình.
+
+- **API & giao tiếp:** Các endpoint `/api/...` vẫn hoạt động bất kể chế độ STA hay AP; dữ liệu được truyền tới Arduino qua `SoftwareSerial`.

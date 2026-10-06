@@ -2,6 +2,10 @@
 #include <ESP8266WebServer.h>
 #include <SoftwareSerial.h>
 #include "web_page.h"
+#include <DNSServer.h>         // <--- THÊM THƯ VIỆN NÀY
+#include <WiFiManager.h>        // <--- THÊM THƯ VIỆN NÀY (Để config WiFi)
+#include <ESP8266mDNS.h>        // <--- THÊM THƯ VIỆN NÀY (Để dùng mayaptrung.local)
+
 
 // Cấu hình chân SoftwareSerial trên NodeMCU ESP8266
 // D5 (GPIO14) làm RX: nối vào chân A1 (TX) của Arduino
@@ -13,8 +17,8 @@ SoftwareSerial linkSerial(ARDUINO_RX_PIN, ARDUINO_TX_PIN);
 
 // const char* ssid = "Trung Tam TT-TV T3";
 // const char* password = "12345679";
-const char* ssid = "Dung-4G_di";
-const char* password = "56320282";
+// const char* ssid = "Dung-4G_di";
+// const char* password = "56320282";
 
 const char* www_username = "manhdinh";
 const char* www_password = "123456";
@@ -120,86 +124,77 @@ void docDuLieuArduino() {
     if (c == '\n') {
       rxBuffer.trim();
       if (rxBuffer.length() > 0) {
-        Serial.println("[ESP NHAN DUOC]: " + rxBuffer);
+        float _t, _tt;
+        int _h, _d, _l, _f, _p, _s, _th;
+        
+        int parsed = sscanf(rxBuffer.c_str(), "T:%f,H:%d,Day:%d,L:%d,F:%d,P:%d,S:%d,TT:%f,TH:%d", 
+                            &_t, &_h, &_d, &_l, &_f, &_p, &_s, &_tt, &_th);
 
-        int idxT  = rxBuffer.indexOf("T:");
-        int idxH  = rxBuffer.indexOf(",H:");
-        int idxD  = rxBuffer.indexOf(",Day:");
-        int idxL  = rxBuffer.indexOf(",L:");
-        int idxF  = rxBuffer.indexOf(",F:");
-        int idxP  = rxBuffer.indexOf(",P:");
-        int idxS  = rxBuffer.indexOf(",S:");
-        int idxTT = rxBuffer.indexOf(",TT:");
-        int idxTH = rxBuffer.indexOf(",TH:");
-
-        if (idxT >= 0 && idxH > idxT && idxD > idxH && idxL > idxD && idxF > idxL) {
-          temp  = rxBuffer.substring(idxT + 2, idxH).toFloat();
-          humi  = rxBuffer.substring(idxH + 3, idxD).toInt();
-          day   = rxBuffer.substring(idxD + 5, idxL).toInt();
-          light = rxBuffer.substring(idxL + 3, idxF).toInt();
-
-          if (idxP > idxF && idxS > idxP && idxTT > idxS && idxTH > idxTT) {
-            fan        = rxBuffer.substring(idxF + 3, idxP).toInt();
-            profileIdx = rxBuffer.substring(idxP + 3, idxS).toInt();
-            stage      = rxBuffer.substring(idxS + 3, idxTT).toInt();
-            targetTemp = rxBuffer.substring(idxTT + 4, idxTH).toFloat();
-            targetHumi = rxBuffer.substring(idxTH + 4).toInt();
-          } else {
-            fan = rxBuffer.substring(idxF + 3).toInt();
+        if (parsed >= 5) {
+          temp = _t;
+          humi = _h;
+          day = _d;
+          light = _l; // <--- CẬP NHẬT TRẠNG THÁI ĐÈN THỰC TẾ TỪ UNO
+          fan = _f;   // <--- CẬP NHẬT TRẠNG THÁI QUẠT THỰC TẾ TỪ UNO
+          if (parsed >= 9) {
+            profileIdx = _p;
+            stage = _s;
+            targetTemp = _tt;
+            targetHumi = _th;
           }
-          Serial.printf("[ESP PARSE OK]: T=%.1f, H=%d, Day=%d, L=%d, F=%d, P=%d, S=%d, TT=%.1f, TH=%d\n",
-                        temp, humi, day, light, fan, profileIdx, stage, targetTemp, targetHumi);
-        } else {
-          Serial.println("[ESP PARSE LOI]: Sai cu phap goi tin!");
         }
       }
       rxBuffer = "";
     } else if (c != '\r') {
       rxBuffer += c;
-      if (rxBuffer.length() > 120) rxBuffer = ""; // Reset chong tran bo dem khi co nhieu
+      if (rxBuffer.length() > 120) rxBuffer = "";  // Reset chong tran bo dem khi co nhieu
     }
   }
 }
-
-
-
+    
   
-void setup() {
-    Serial.begin(115200);          // Serial cứng để cắm cáp debug máy tính
-  linkSerial.begin(9600);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno      
+ void setup() {
+  Serial.begin(115200);          // Serial cứng để cắm cáp debug máy tính
+  linkSerial.begin(9600);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno           
   
-  // Tắt tự động kết nối lại mạng cũ trong Flash để tránh xung đột
-  WiFi.setAutoConnect(false);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  
-  Serial.print("Dang ket noi WiFi ");
-  int retry = 0;
-  while (WiFi.status() != WL_CONNECTED && retry < 20) {
-    delay(500);
-    Serial.print(".");
-    retry++;
+  // ================= CẤU HÌNH WIFIMANAGER =================
+  WiFiManager wifiManager;
+
+  // Nếu không kết nối được WiFi cũ trong 180 giây (3 phút), 
+  // ESP sẽ giữ nguyên AP "eggincubator_config" để bạn cấu hình lại.
+  wifiManager.setConfigPortalTimeout(180);
+
+  // Phát WiFi tên "eggincubator_config" (mật khẩu mặc định: 12345678)
+  // Khi điện thoại bắt WiFi này, trang cấu hình chọn WiFi/Nhập mật khẩu sẽ TỰ ĐỘNG BẬT LÊN!
+  if (!wifiManager.autoConnect("EggIncubator_Config", "12345678")) {
+    Serial.println("Khong ket noi duoc WiFi va het thoi gian chờ Config! Khoi dong lai...");
+    delay(3000);
+    ESP.restart(); // Khởi động lại để thử kết nối lại
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi ket noi thanh cong! IP Web: " + WiFi.localIP().toString());
+  Serial.println("\n-> WiFi ket noi thanh cong!");
+  Serial.print("-> IP Web: ");
+  Serial.println(WiFi.localIP());
+
+  // ================= CẤU HÌNH TEN MIEN .LOCAL (mDNS) =================
+  if (MDNS.begin("mayaptrung")) { // Tên miền: http://mayaptrung.local
+    Serial.println("-> mDNS responder da khoi tao! Mien truy cap: http://mayaptrung.local");
   } else {
-    Serial.println("\nKhong the ket noi WiFi! Tu dong phat Access Point AP...");
-    
-    // NGẮT HẲN STA VÀ CHỜ DỪNG HẲN TRƯỚC KHI BẬT AP
-    WiFi.disconnect(true);
-    delay(200);
-    
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP("MayApTrung_WiFi", "12345678");
-    Serial.println("AP IP Web: " + WiFi.softAPIP().toString());
+    Serial.println("-> Loi khoi tao mDNS!");
   }
 
+  // Khởi tạo các đường dẫn Web Server
   setupRoutes();
+  
+  // Bổ sung dịch vụ HTTP cho mDNS
+  MDNS.addService("http", "tcp", 80);
+  
   server.begin();
 }
 
+
 void loop() {
+  MDNS.update();        // <--- THÊM DÒNG NÀY để duy trì tên miền mayaptrung.local
   server.handleClient();
   docDuLieuArduino();
 }
