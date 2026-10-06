@@ -379,12 +379,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       { icon: "🦚", name: "Chim Trĩ Đỏ Khoang Cổ", tAp: 37.6, hAp: 60, tNo: 37.0, hNo: 70, days: 24, hatchDay: 21 },
       { icon: "🧪", name: "Chế Độ Test Hệ Thống (Mô Phỏng)", tAp: 27.0, hAp: 60, tNo: 28.0, hNo: 65, days: 3, hatchDay: 2 }
     ];
-    
-    // BIẾN TOÀN CỤC MỚI (Tối ưu chống đơ)
-    let currentSelectedIdx = 0, isAlarming = false;
-    let heaterState = 0, fanState = 0;
-    let isFetching = false;
-    let pausePolling = false; // Cờ nhường đường truyền khi bấm nút
+    let currentSelectedIdx = 0, heaterState = 0, fanState = 0, isAlarming = false;
 
     function initCustomDropdown() {
       let menu = document.getElementById('customDropdownMenu'), html = '';
@@ -440,30 +435,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }, 2400);
     }
 
-    // HÀM MỚI 1: Cập nhật Rơ-le tách rời (Giúp đổi màu mượt ngay lập tức)
-    function updateRelayUI() {
-      let btnH = document.getElementById('btnHeater'), txtH = document.getElementById('txtHeater');
-      let btnF = document.getElementById('btnFan'), txtF = document.getElementById('txtFan');
-      
-      if (btnH && txtH) {
-        btnH.className = heaterState ? 'switch-btn active-heater' : 'switch-btn';
-        txtH.innerText = heaterState ? 'ON' : 'OFF';
-      }
-      if (btnF && txtF) {
-        btnF.className = fanState ? 'switch-btn active-fan' : 'switch-btn';
-        txtF.innerText = fanState ? 'ON' : 'OFF';
-      }
-    }
-
-    // HÀM MỚI 2: Đệ quy chống nghẽn (Thay thế setInterval)
-    function autoFetchLoop() {
-      // Tạm dừng tải nếu người dùng đang thực hiện lệnh bấm nút
-      if (isFetching || pausePolling) {
-        setTimeout(autoFetchLoop, 800);
-        return;
-      }
-
-      isFetching = true;
+    function updateData() {
       fetch('/api/data')
         .then(r => {
           if (!r.ok) throw new Error("HTTP " + r.status);
@@ -471,10 +443,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         })
         .then(d => {
           let tempEl = document.getElementById('temp');
-          if (typeof d.temp === 'number') tempEl.innerText = d.temp.toFixed(1);
+          if (typeof d.temp === 'number') {
+            tempEl.innerText = d.temp.toFixed(1);
+          }
           if (d.humi !== undefined) document.getElementById('humi').innerText = d.humi;
           if (d.day !== undefined) document.getElementById('day').innerText = d.day;
           
+          // Cập nhật loại trứng đang ấp thực tế trên máy
           let activeProfileIdx = (typeof d.profile === 'number' && d.profile >= 0 && d.profile < EGG_DB.length) ? d.profile : currentSelectedIdx;
           let curEgg = EGG_DB[activeProfileIdx];
           document.getElementById('curEggIcon').innerText = curEgg.icon;
@@ -482,6 +457,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           document.getElementById('curHatchFromDay').innerText = 'Ngày ' + curEgg.hatchDay;
           document.getElementById('maxDay').innerText = `/ ${curEgg.days} ngày`;
 
+          // Giai đoạn đang ấp (0: Ấp phôi, 1: Cận nở)
           let stageBadge = document.getElementById('curStageBadge');
           let isHatchingStage = (d.stage === 1) || (d.day >= curEgg.hatchDay);
           if (isHatchingStage) {
@@ -492,71 +468,98 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             stageBadge.innerHTML = '🌱 Ấp Phôi (Phát Triển)';
           }
 
+          // Mục tiêu nhiệt độ / độ ẩm đang áp dụng
           let curT = (typeof d.targetTemp === 'number') ? d.targetTemp.toFixed(1) : (isHatchingStage ? curEgg.tNo.toFixed(1) : curEgg.tAp.toFixed(1));
           let curH = (typeof d.targetHumi === 'number') ? d.targetHumi : (isHatchingStage ? curEgg.hNo : curEgg.hAp);
           document.getElementById('curTargetTemp').innerText = curT + '°C';
           document.getElementById('curTargetHumi').innerText = curH + '%';
 
+          // Cảnh báo môi trường
           let banner = document.getElementById('alertBanner');
           let alertText = document.getElementById('alertText');
           let targetMax = parseFloat(curT) + 0.8;
           let targetMin = parseFloat(curT) - 1.5;
 
           if (d.temp === 0 || d.humi === 0) {
-            tempEl.classList.add('temp-danger'); tempEl.classList.remove('temp-cold');
+            tempEl.classList.add('temp-danger');
+            tempEl.classList.remove('temp-cold');
             alertText.innerHTML = `❌ <b>LỖI CẢM BIẾN!</b> Không nhận được tín hiệu DHT11. Hãy kiểm tra dây nối!`;
             banner.classList.add('show');
           } else if (d.temp >= targetMax || d.temp >= 38.3) {
-            tempEl.classList.add('temp-danger'); tempEl.classList.remove('temp-cold');
+            tempEl.classList.add('temp-danger');
+            tempEl.classList.remove('temp-cold');
             alertText.innerHTML = `🚨 <b>QUÁ NHIỆT NGUY CẤP (${d.temp.toFixed(1)}°C)!</b> Còi dồn dập, quạt đang xả nhiệt!`;
-            banner.classList.add('show'); triggerScreenAlert();
+            banner.classList.add('show');
+            triggerScreenAlert();
           } else if (d.temp <= targetMin) {
-            tempEl.classList.remove('temp-danger'); tempEl.classList.add('temp-cold');
+            tempEl.classList.remove('temp-danger');
+            tempEl.classList.add('temp-cold');
             alertText.innerHTML = `❄️ <b>QUÁ LẠNH (${d.temp.toFixed(1)}°C)!</b> Còi kêu chậm, đèn sưởi đang kích nhiệt!`;
-            banner.classList.add('show'); triggerScreenAlert();
+            banner.classList.add('show');
+            triggerScreenAlert();
           } else if ((isHatchingStage && d.humi < 45) || d.humi > 88) {
-            tempEl.classList.remove('temp-danger'); tempEl.classList.remove('temp-cold');
+            tempEl.classList.remove('temp-danger');
+            tempEl.classList.remove('temp-cold');
             alertText.innerHTML = `💧 <b>CẢNH BÁO ĐỘ ẨM (${d.humi}%)!</b> Lệch ngưỡng an toàn cho sự sống của phôi!`;
-            banner.classList.add('show'); triggerScreenAlert();
+            banner.classList.add('show');
+            triggerScreenAlert();
           } else {
-            tempEl.classList.remove('temp-danger'); tempEl.classList.remove('temp-cold');
+            tempEl.classList.remove('temp-danger');
+            tempEl.classList.remove('temp-cold');
             banner.classList.remove('show');
           }
 
+          // Tiến độ ngày
           let totalDays = curEgg.days;
           let percent = Math.min(100, Math.round(((d.day || 1) / totalDays) * 100));
           document.getElementById('txtDayPercent').innerText = percent + '%';
           document.getElementById('dayBar').style.width = percent + '%';
 
-          // Chỉ cập nhật trạng thái nút nếu người dùng KHÔNG đang thực hiện thao tác bấm
-          if (!pausePolling) {
-            heaterState = d.light; 
-            fanState = d.fan;
-            updateRelayUI();
-          }
+          // Trạng thái Rơ-le
+          heaterState = d.light; fanState = d.fan;
+          let btnH = document.getElementById('btnHeater'), txtH = document.getElementById('txtHeater');
+          let btnF = document.getElementById('btnFan'), txtF = document.getElementById('txtFan');
+          btnH.className = heaterState ? 'switch-btn active-heater' : 'switch-btn';
+          txtH.innerText = heaterState ? 'ON' : 'OFF';
+          btnF.className = fanState ? 'switch-btn active-fan' : 'switch-btn';
+          txtF.innerText = fanState ? 'ON' : 'OFF';
         })
-        .catch(err => console.warn('Lỗi đọc dữ liệu /api/data:', err))
-        .finally(() => {
-          isFetching = false;
-          // Hoàn thành xong chu trình mới nghỉ 1.5s và gọi lại vòng lặp
-          setTimeout(autoFetchLoop, 1500); 
+        .catch(err => {
+          console.warn('Lỗi đọc dữ liệu /api/data:', err);
         });
     }
 
-    // HÀM MỚI 3: Điều khiển mượt mà (Optimistic UI)
+    // THAY BẰNG CƠ CHẾ ĐỆ QUY CHỐNG NGHẼN NÀY:
+let isFetching = false;
+
+function autoFetchLoop() {
+  if (isFetching) return;
+  isFetching = true;
+
+  fetch('/api/data')
+    .then(r => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(d => {
+      // Cập nhật giao diện... (Giữ nguyên toàn bộ phần cập nhật UI của bạn)
+      updateUI(d); 
+    })
+    .catch(err => console.warn('Trễ kết nối:', err))
+    .finally(() => {
+      isFetching = false;
+      // Chờ server phản hồi xong 800ms mới hỏi tiếp, Web chạy cực kỳ mượt!
+      setTimeout(autoFetchLoop, 800); 
+    });
+}
+
+// Khởi chạy vòng lặp
+autoFetchLoop();
+
     function toggleDevice(dev) {
-      pausePolling = true; // Chặn server gửi đè trạng thái
-      setTimeout(() => { pausePolling = false; }, 2000);
-
-      // Đảo màu sắc TỨC THÌ
-      if (dev === 'heater') heaterState = heaterState ? 0 : 1;
-      else if (dev === 'fan') fanState = fanState ? 0 : 1;
-      updateRelayUI();
-
-      // Gửi ngầm lệnh điều khiển xuống chip
-      let val = (dev === 'heater') ? heaterState : fanState;
-      fetch(`/api/toggle?device=${dev}&val=${val}`)
-        .catch(err => console.log('Lỗi gửi lệnh:', err));
+      if (dev === 'heater') { heaterState = heaterState ? 0 : 1; fetch('/api/toggle?device=heater&val=' + heaterState); }
+      else if (dev === 'fan') { fanState = fanState ? 0 : 1; fetch('/api/toggle?device=fan&val=' + fanState); }
+      updateData();
     }
 
     function applyCurrentProfile() { 
@@ -577,8 +580,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         if (!isNaN(val) && val >= 1 && val <= 45) {
           fetch('/api/set_day?val=' + val)
             .then(r => {
-              if (r.ok) alert('✅ Đã cập nhật ngày ấp thành: Ngày ' + val);
-              else alert('Lỗi cài đặt ngày: HTTP ' + r.status);
+              if (r.ok) {
+                alert('✅ Đã cập nhật ngày ấp thành: Ngày ' + val);
+                updateData();
+              } else alert('Lỗi cài đặt ngày: HTTP ' + r.status);
             })
             .catch(e => alert('Lỗi kết nối: ' + e));
         } else {
@@ -621,10 +626,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         .catch(e => alert('Lỗi kết nối: ' + e));
     }
 
-    // Khởi tạo các UI và kích hoạt vòng lặp mượt mà
-    initCustomDropdown(); 
-    renderProfileInfo(); 
-    autoFetchLoop(); 
+    initCustomDropdown(); renderProfileInfo(); updateData();
   </script>
 </body>
 </html>

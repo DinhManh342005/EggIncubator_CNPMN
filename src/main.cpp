@@ -263,7 +263,7 @@ void kiemTraTangNgayRTC() {
 
 void setup() {
   Serial.begin(9600);
-  espSerial.begin(19200); // Tăng tốc độ từ 9600 -> 38400 Baud
+  espSerial.begin(38400); // Tăng tốc độ từ 9600 -> 38400 Baud
   espSerial.setTimeout(50); 
 
   Serial.println(F("\n=== HE THONG MAY AP TRUNG KHOI DONG ==="));

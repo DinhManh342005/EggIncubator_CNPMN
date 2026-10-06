@@ -61,23 +61,21 @@ void setupRoutes() {
   server.on("/", handleRoot);
   server.on("/api/data", handleData);
 
-server.on("/api/toggle", []() {
-  if (!kiemTraDangNhap()) return;
-  
-  // Trả về OK cho Web ngay lập tức để giải phóng hàng đợi HTTP
-  server.send(200, "text/plain", "OK");
-
-  String dev = server.arg("device");
-  int val = server.arg("val").toInt();
-  
-  if (dev == "heater") {
-    light = val;
-    linkSerial.println("CMD:HEATER:" + String(val));
-  } else if (dev == "fan") {
-    fan = val;
-    linkSerial.println("CMD:FAN:" + String(val));
-  }
-});
+  server.on("/api/toggle", []() {
+    if (!kiemTraDangNhap()) return;
+    String dev = server.arg("device");
+    int val = server.arg("val").toInt();
+    if (dev == "heater") {
+      light = val;
+      linkSerial.println("CMD:HEATER:" + String(val));
+      Serial.println("[ESP GUI ARDUINO]: CMD:HEATER:" + String(val));
+    } else if (dev == "fan") {
+      fan = val;
+      linkSerial.println("CMD:FAN:" + String(val));
+      Serial.println("[ESP GUI ARDUINO]: CMD:FAN:" + String(val));
+    }
+    server.send(200, "text/plain", "OK");
+  });
 
   server.on("/api/profile", []() {
     if (!kiemTraDangNhap()) return;
@@ -152,7 +150,7 @@ void docDuLieuArduino() {
 
  void setup() {
   Serial.begin(115200);          // Serial cứng để cắm cáp debug máy tính
-  linkSerial.begin(19200);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno           
+  linkSerial.begin(38400);        // SoftwareSerial nối sang chân A0/A1 của Arduino Uno           
   
   // ================= CẤU HÌNH WIFIMANAGER =================
   WiFiManager wifiManager;
