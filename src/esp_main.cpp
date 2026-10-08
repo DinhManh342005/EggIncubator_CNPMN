@@ -155,7 +155,10 @@ void docDuLieuArduino() {
   // ================= CẤU HÌNH WIFIMANAGER =================
   WiFiManager wifiManager;
 
-  // Nếu không kết nối được WiFi cũ trong 180 giây (3 phút), 
+  // Tên máy được giữ ổn định trên mạng LAN và dùng cho mDNS.
+  wifiManager.setHostname("mayaptrung");
+
+  // Nếu không kết nối được WiFi cũ trong 180 giây (3 phút),
   // ESP sẽ giữ nguyên AP "eggincubator_config" để bạn cấu hình lại.
   wifiManager.setConfigPortalTimeout(180);
 
@@ -167,9 +170,15 @@ void docDuLieuArduino() {
     ESP.restart(); // Khởi động lại để thử kết nối lại
   }
 
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
+
   Serial.println("\n-> WiFi ket noi thanh cong!");
   Serial.print("-> IP Web: ");
   Serial.println(WiFi.localIP());
+  Serial.print("-> Hostname: ");
+  Serial.println(WiFi.hostname());
 
   // ================= CẤU HÌNH TEN MIEN .LOCAL (mDNS) =================
   if (MDNS.begin("mayaptrung")) { // Tên miền: http://mayaptrung.local
@@ -180,10 +189,9 @@ void docDuLieuArduino() {
 
   // Khởi tạo các đường dẫn Web Server
   setupRoutes();
-  
+
   // Bổ sung dịch vụ HTTP cho mDNS
   MDNS.addService("http", "tcp", 80);
-  
   server.begin();
 }
 

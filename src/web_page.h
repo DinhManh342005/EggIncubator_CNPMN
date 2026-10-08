@@ -548,8 +548,8 @@ function autoFetchLoop() {
     .catch(err => console.warn('Trễ kết nối:', err))
     .finally(() => {
       isFetching = false;
-      // Chờ server phản hồi xong 800ms mới hỏi tiếp, Web chạy cực kỳ mượt!
-      setTimeout(autoFetchLoop, 800); 
+      // Hỏi lại 500ms sau khi nhận phản hồi; vẫn chỉ có một request tại một thời điểm.
+      setTimeout(autoFetchLoop, 500);
     });
 }
 
