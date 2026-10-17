@@ -216,6 +216,49 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
     .guide-box-title { color: #cbd5e1; font-weight: 700; display: flex; align-items: center; gap: 6px; }
     .guide-item { display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+    .theme-toggle {
+      margin-top: 10px; padding: 8px 12px; border: 1px solid var(--card-border);
+      border-radius: 10px; background: var(--card); color: var(--text);
+      font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;
+    }
+    .theme-toggle:hover { border-color: var(--primary); }
+
+    body[data-theme="light"] {
+      --bg: #e9eef3;
+      --card: #f4f6f8;
+      --card-border: rgba(51, 65, 85, 0.12);
+      --primary: #28749a;
+      --text: #263746;
+      --subtext: #667887;
+      background: var(--bg);
+    }
+    body[data-theme="light"] .header h1,
+    body[data-theme="light"] .egg-name-box h3,
+    body[data-theme="light"] .card-value,
+    body[data-theme="light"] .egg-info-item b,
+    body[data-theme="light"] .modal-title,
+    body[data-theme="light"] .guide-box-title { color: var(--text); }
+    body[data-theme="light"] .active-egg-card {
+      background: linear-gradient(135deg, #f6f8fa 0%, #e5edf2 100%);
+      border-color: rgba(40, 116, 154, 0.22);
+      box-shadow: 0 8px 25px rgba(41, 59, 73, 0.09);
+    }
+    body[data-theme="light"] .target-stats-bar { background: rgba(232, 238, 243, 0.82); border-color: rgba(51, 65, 85, 0.08); }
+    body[data-theme="light"] .card { box-shadow: 0 4px 16px rgba(41, 59, 73, 0.07); }
+    body[data-theme="light"] .progress-track { background: rgba(51, 65, 85, 0.1); }
+    body[data-theme="light"] .day-quick-btn { background: #edf1f4; border-color: rgba(51, 65, 85, 0.14); color: var(--text); }
+    body[data-theme="light"] .switch-btn { background: rgba(244, 246, 248, 0.85); }
+    body[data-theme="light"] .dropdown-btn { background: #edf2f5; color: var(--text); }
+    body[data-theme="light"] .dropdown-menu { background: #f3f5f7; border-color: rgba(51, 65, 85, 0.14); box-shadow: 0 10px 25px rgba(41, 59, 73, 0.16); }
+    body[data-theme="light"] .dropdown-item { color: #3d5261; border-bottom-color: rgba(51, 65, 85, 0.07); }
+    body[data-theme="light"] .dropdown-item:hover,
+    body[data-theme="light"] .dropdown-item:active { color: #263746; }
+    body[data-theme="light"] .egg-info-box { background: rgba(235, 240, 244, 0.9); border-color: rgba(51, 65, 85, 0.15); }
+    body[data-theme="light"] .btn-edit { background: #e1e8ed; border-color: #cbd6de; color: #263746; }
+    body[data-theme="light"] .btn-edit:hover { background: #d5e0e7; }
+    body[data-theme="light"] .modal-box { background: #f2f5f7; border-color: rgba(51, 65, 85, 0.15); box-shadow: 0 10px 30px rgba(41, 59, 73, 0.18); }
+    body[data-theme="light"] .field-group input { background: #e9eef2; border-color: rgba(51, 65, 85, 0.16); color: #263746; }
+    body[data-theme="light"] .guide-box { background: rgba(239, 243, 246, 0.9); border-color: rgba(51, 65, 85, 0.09); }
   </style>
 </head>
 <body>
@@ -232,6 +275,9 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <div class="header-tag">✨ IoT Smart Incubator System</div>
       <h1>🥚 MÁY ẤP TRỨNG THÔNG MINH</h1>
       <p>Giám sát vi khí hậu & Tự động điều chỉnh giai đoạn</p>
+      <button class="theme-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-pressed="false">
+        ☀️ Giao diện sáng
+      </button>
     </div>
 
     <!-- Thẻ Đang Ấp Trứng Hiện Tại -->
@@ -381,6 +427,26 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     ];
     let currentSelectedIdx = 0, heaterState = 0, fanState = 0, isAlarming = false;
 
+    function setTheme(theme, persist = false) {
+      const isLight = theme === 'light';
+      document.body.dataset.theme = isLight ? 'light' : 'dark';
+      const button = document.getElementById('themeToggle');
+      button.innerText = isLight ? '🌙 Giao diện tối' : '☀️ Giao diện sáng';
+      button.setAttribute('aria-pressed', String(isLight));
+
+      if (persist) {
+        try {
+          localStorage.setItem('incubator-theme', isLight ? 'light' : 'dark');
+        } catch (error) {
+          console.warn('Không thể lưu tùy chọn giao diện:', error);
+        }
+      }
+    }
+
+    function toggleTheme() {
+      setTheme(document.body.dataset.theme === 'light' ? 'dark' : 'light', true);
+    }
+
     function initCustomDropdown() {
       let menu = document.getElementById('customDropdownMenu'), html = '';
       EGG_DB.forEach((p, idx) => {
@@ -435,8 +501,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }, 2400);
     }
 
+    let isFetching = false;
+
     function updateData() {
-      fetch('/api/data')
+      if (isFetching) return;
+      isFetching = true;
+
+      fetch('/api/data', { cache: 'no-store' })
         .then(r => {
           if (!r.ok) throw new Error("HTTP " + r.status);
           return r.json();
@@ -526,35 +597,12 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         })
         .catch(err => {
           console.warn('Lỗi đọc dữ liệu /api/data:', err);
+        })
+        .finally(() => {
+          isFetching = false;
+          setTimeout(updateData, document.hidden ? 2000 : 500);
         });
     }
-
-    // THAY BẰNG CƠ CHẾ ĐỆ QUY CHỐNG NGHẼN NÀY:
-let isFetching = false;
-
-function autoFetchLoop() {
-  if (isFetching) return;
-  isFetching = true;
-
-  fetch('/api/data')
-    .then(r => {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    })
-    .then(d => {
-      // Cập nhật giao diện... (Giữ nguyên toàn bộ phần cập nhật UI của bạn)
-      updateUI(d); 
-    })
-    .catch(err => console.warn('Trễ kết nối:', err))
-    .finally(() => {
-      isFetching = false;
-      // Hỏi lại 500ms sau khi nhận phản hồi; vẫn chỉ có một request tại một thời điểm.
-      setTimeout(autoFetchLoop, 500);
-    });
-}
-
-// Khởi chạy vòng lặp
-autoFetchLoop();
 
     function toggleDevice(dev) {
       if (dev === 'heater') { heaterState = heaterState ? 0 : 1; fetch('/api/toggle?device=heater&val=' + heaterState); }
@@ -626,6 +674,13 @@ autoFetchLoop();
         .catch(e => alert('Lỗi kết nối: ' + e));
     }
 
+    let savedTheme = null;
+    try {
+      savedTheme = localStorage.getItem('incubator-theme');
+    } catch (error) {
+      console.warn('Không thể đọc tùy chọn giao diện:', error);
+    }
+    setTheme(savedTheme === 'light' ? 'light' : 'dark');
     initCustomDropdown(); renderProfileInfo(); updateData();
   </script>
 </body>
